@@ -6,7 +6,7 @@ This project implements a bare-metal, `no_std` Rust-based telemetry pipeline usi
 
 The system consists of two ESP32-C3-based nodes:
 - **Sensor Node**: Interfaces with an MPU-6050 IMU via I2C (400 kHz) to collect motion data (temperature, accelerometer, and gyroscope) and transmits it over TWAI (CAN bus) at 500 kbit/s to the Gateway Node.
-- **Gateway Node**: Receives CAN data, connects to a Wi-Fi network as a station (STA), and forwards the data to an MQTT broker (e.g., `app.coreiot.io`) via TCP. The Gateway Node enters light-sleep mode when no CAN traffic is detected for 7 seconds and wakes on the next TWAI RX interrupt.
+- **Gateway Node**: Receives CAN data, connects to a Wi-Fi network as a station (STA), and forwards the data to an MQTT broker (e.g., `app.coreiot.io`) via TCP. The Gateway Node enters light-sleep mode when no CAN traffic is detected and wakes every 25 seconds if no CAN traffic is present.
 
 Both nodes operate in a bare-metal environment using the Embassy executor for interrupt-driven task management, with no RTOS. The project uses nightly Rust (≥1.78) with custom panic and allocation error handlers, and logging is performed via `defmt` or UART.
 
@@ -23,9 +23,10 @@ Both nodes operate in a bare-metal environment using the Embassy executor for in
   - Uses a CRC-8-AUTOSAR checksum for data integrity.
   - Toggles an LED (GPIO8) to indicate bus-off errors and adjusts the read interval (10 ms normal, 1000 ms during bus-off).
 - **Files**:
-  - `main.rs`: Main application logic, initializes peripherals, and spawns tasks for IMU reading, CAN transmission, and debugging.
-  - `can_transfer.rs`: Handles CAN frame transmission, splitting the 15-byte packet into three frames.
-  - `lib.rs`, `mpu.rs`, `bits.rs`: MPU-6050 driver for I2C communication and data processing.
+  - `src/main.rs`: Main application logic, initializes peripherals, and spawns tasks for IMU reading, CAN transmission, and debugging.
+  - `src/can_transfer.rs`: Handles CAN frame transmission, splitting the 15-byte packet into three frames.
+  - `src/mpu6050_lib/lib.rs`, `src/mpu6050_lib/mpu.rs`, `src/mpu6050_lib/bits.rs`: MPU-6050 driver for I2C communication and data processing.
+  - `Cargo.toml`: Project configuration for the Sensor Node.
 
 ### Gateway Node
 - **Hardware**: ESP32-C3
@@ -35,12 +36,12 @@ Both nodes operate in a bare-metal environment using the Embassy executor for in
 - **Functionality**:
   - Receives CAN frames, reassembles them into a 15-byte packet, and verifies the CRC.
   - Formats the data into JSON and publishes it to the MQTT topic `v1/devices/me/telemetry` on `app.coreiot.io:1883`.
-  - Enters light-sleep mode after 7 seconds of no CAN traffic, waking on the next TWAI RX interrupt.
+  - Enters light-sleep mode when no CAN traffic is detected, waking every 25 seconds if no traffic is present.
   - Uses Embassy for task management and `esp_wifi` for Wi-Fi connectivity.
 - **Files**:
-  - `main.rs`: Main application logic, initializes Wi-Fi, CAN, and MQTT client, and manages sleep/wake cycles.
-  - `receive.rs`: Handles CAN frame reception, reassembly, and JSON formatting.
-  - `bmp180_async.rs`: Placeholder for additional sensor support (not currently used).
+  - `src/main.rs`: Main application logic, initializes Wi-Fi, CAN, and MQTT client, and manages sleep/wake cycles.
+  - `src/can/receive.rs`: Handles CAN frame reception, reassembly, and JSON formatting.
+  - `Cargo.toml`: Project configuration for the Gateway Node.
 
 ### Common Protocol
 - **Data Format**: 15-byte packet (2 bytes temperature, 6 bytes gyroscope, 6 bytes accelerometer, 1 byte CRC-8-AUTOSAR).
@@ -71,7 +72,7 @@ Both nodes operate in a bare-metal environment using the Embassy executor for in
 ## Flashing Instructions
 
 1. **Install Toolchain**:
-   - Install `espup` and add the Rust target for ESP32-C3: `riscv32imac-unknown-none-elf`.
+   - Install `espup` and ensure the Rust environment is set up for ESP32-C3.
    - Verify with `cargo espflash --version`.
 
 2. **Clone Repository**:
@@ -84,15 +85,14 @@ Both nodes operate in a bare-metal environment using the Embassy executor for in
    - Sensor Node:
      ```bash
      cd sensor-node
-     cargo build --release
-     cargo espflash flash --release --target riscv32imac-unknown-none-elf
+     cargo run --release
      ```
    - Gateway Node:
      ```bash
      cd gateway-node
-     cargo build --release
-     cargo espflash flash --release --target riscv32imac-unknown-none-elf
+     cargo run --release
      ```
+   - Note: `cargo run --release` builds and flashes the firmware using `espflash`. Ensure `espflash` is configured in your `Cargo.toml` or environment.
 
 4. **Monitor Output**:
    ```bash
@@ -103,7 +103,7 @@ Both nodes operate in a bare-metal environment using the Embassy executor for in
 
 1. Configure the Gateway Node with your MQTT broker credentials:
    - Set `SSID` and `PASSWORD` environment variables in `gateway-node/.env` for Wi-Fi.
-   - Update the MQTT client configuration in `gateway-node/main.rs` (username and client ID, e.g., `vUTga2R9Qdwg0GHredeo`).
+   - Update the MQTT client configuration in `gateway-node/src/main.rs` (username and client ID, e.g., `vUTga2R9Qdwg0GHredeo`).
 2. Ensure the broker (e.g., `app.coreiot.io:1883`) is accessible and supports MQTT v5.
 
 ## Testing and Verification
@@ -111,7 +111,7 @@ Both nodes operate in a bare-metal environment using the Embassy executor for in
 - **Loopback Test**: Run TWAI self-test on each board to verify CAN functionality.
 - **IMU Driver Test**: Use host-side unit tests with a mock I2C interface to validate the MPU-6050 driver.
 - **Latency Test**: Measure CAN ISR and MQTT publish latency using a scope on GPIO toggles.
-- **Sleep Cycle Test**: Simulate CAN pulses every 7 seconds to verify sleep/wake behavior.
+- **Sleep Cycle Test**: Simulate CAN pulses to verify the Gateway Node's sleep/wake behavior (wakes every 25 seconds if no CAN traffic).
 - **Long-Run Test**: Run for 8 hours, logging metrics via UART or a metrics socket.
 
 ## Project Structure
@@ -126,31 +126,25 @@ Both nodes operate in a bare-metal environment using the Embassy executor for in
 │   │   │   ├── lib.rs
 │   │   │   ├── mpu.rs
 │   │   │   ├── bits.rs
+│   ├── Cargo.toml
 ├── gateway-node/
 │   ├── src/
 │   │   ├── main.rs
-│   │   ├── receive.rs
-│   │   ├── bmp180_async.rs
+│   │   ├── can/
+│   │   │   ├── receive.rs
+│   ├── Cargo.toml
 ├── common-protocol/
 │   ├── (shared CAN packet definitions, if any)
 ├── README.md
 ├── Cargo.toml
 ```
 
-## Deliverables
-
-1. **Source Repository**: Organized as above with CI (cargo check, clippy, rustfmt).
-2. **Binaries**: Release binaries and map size reports for both nodes.
-3. **Documentation**:
-   - This README.md
-   - Design docs with state machines, memory map, and ISR list (TBD).
-4. **Demo Video**: <10-minute video showcasing motion data to MQTT and sleep cycles.
-
 ## Notes
 
 - The project uses `esp_alloc` for heap allocation on the Gateway Node and no heap on the Sensor Node.
 - Logging is implemented via `defmt` for the Sensor Node and `log` for the Gateway Node.
 - The Sensor Node uses a fixed 10 ms read interval, adjustable to 1000 ms during CAN bus-off.
-- The Gateway Node implements a 7-second inactivity timer for light-sleep, with a 25-second MQTT reconnection cycle.
+- The Gateway Node enters light-sleep when no CAN traffic is detected and wakes every 25 seconds if no traffic is present, with a 25-second MQTT reconnection cycle.
+- Ensure `Cargo.toml` for each node includes dependencies like `esp-hal`, `embassy-executor`, and `defmt` (Sensor Node) or `log` (Gateway Node), and configures `espflash` for `cargo run`.
 
 For additional setup help or linker scripts, contact the project mentor.
