@@ -133,10 +133,7 @@ Both nodes operate in a bare-metal environment using the Embassy executor for in
 │   │   ├── can/
 │   │   │   ├── receive.rs
 │   ├── Cargo.toml
-├── common-protocol/
-│   ├── (shared CAN packet definitions, if any)
 ├── README.md
-├── Cargo.toml
 ```
 
 ## Notes
