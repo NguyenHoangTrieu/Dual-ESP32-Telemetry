@@ -71,7 +71,7 @@ Both nodes operate in a bare-metal environment using the Embassy executor for in
 
 ## Flashing Instructions
 
-Refer to this book for more information: https://docs.espressif.com/projects/rust/book/installation/riscv.html
+Refer to this book for a detailed instruction: https://docs.espressif.com/projects/rust/book/installation/riscv.html
 
 1. **Install Toolchain**:
    - Install `espup` and ensure the Rust environment is set up for ESP32-C3.
