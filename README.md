@@ -35,7 +35,7 @@ Both nodes operate in a bare-metal environment using the Embassy executor for in
   - Wi-Fi STA for connecting to an MQTT broker via TCP.
 - **Functionality**:
   - Receives CAN frames, reassembles them into a 15-byte packet, and verifies the CRC.
-  - Formats the data into JSON and publishes it to the MQTT topic `v1/devices/me/telemetry` on `app.coreiot.io:1883`.
+  - Formats the data into JSON and publishes it to the MQTT topic `v1/devices/me/telemetry` on `app.coreiot.io:1883`. (https://app.coreiot.io/login)
   - Enters light-sleep mode when no CAN traffic is detected, waking every 25 seconds if no traffic is present.
   - Uses Embassy for task management and `esp_wifi` for Wi-Fi connectivity.
 - **Files**:
