@@ -71,6 +71,8 @@ Both nodes operate in a bare-metal environment using the Embassy executor for in
 
 ## Flashing Instructions
 
+Refer to this book for more information: https://docs.espressif.com/projects/rust/book/installation/riscv.html
+
 1. **Install Toolchain**:
    - Install `espup` and ensure the Rust environment is set up for ESP32-C3.
    - Verify with `cargo espflash --version`.
@@ -143,5 +145,4 @@ Both nodes operate in a bare-metal environment using the Embassy executor for in
 - The Sensor Node uses a fixed 10 ms read interval, adjustable to 1000 ms during CAN bus-off.
 - The Gateway Node enters light-sleep when no CAN traffic is detected and wakes every 25 seconds if no traffic is present, with a 25-second MQTT reconnection cycle.
 - Ensure `Cargo.toml` for each node includes dependencies like `esp-hal`, `embassy-executor`, and `defmt` (Sensor Node) or `log` (Gateway Node), and configures `espflash` for `cargo run`.
-
-For additional setup help or linker scripts, contact the project mentor.
+- A mechanism is still required to handle CAN bus-off state recovery.
